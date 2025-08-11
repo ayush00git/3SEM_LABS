@@ -1,6 +1,3 @@
-// print prime number in an given interval
-// palindrome number
-
 #include <bits/stdc++.h>
 using namespace std;
 
