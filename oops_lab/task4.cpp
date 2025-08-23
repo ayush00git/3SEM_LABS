@@ -14,7 +14,7 @@ float average(int a[], int n){
     return avg;
 }
 
-int max(int a[], int n){
+int maxi(int a[], int n){
     int max = a[0];
     for(int i = 1; i < n; i++){
         if(a[i] > max){
@@ -36,11 +36,18 @@ void addition(int a[][3], int b[][3], int n, int m) {
 }
 int main() {
 
-    int a[] = {1, 2, 3, 4};
-    int n = sizeof(a) / sizeof(a[0]);
+    int n;
+    cout<<"Enter the size of the array: ";
+    cin>>n;
+
+    int a[n];
+    for(int i = 0; i < n; i++){
+        cout<<(i+1)<<" index: ";
+        cin>>a[i];
+    }
     
     float av = average(a, n);
-    int largest = max(a, n);
+    int largest = maxi(a, n);
 
     cout<<"The avergae of numbers in the array is: "<<(av)<<endl;
     cout<<"The maximum number in the array is: "<<largest<<endl;
