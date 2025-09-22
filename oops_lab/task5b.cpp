@@ -34,6 +34,10 @@ int main() {
 
     cout << "Max marks in the whole 2D array = " << maxMarks << endl;
 
+    // pointer arithmetic
+    cout<<**(classes + 1)<<endl;
+    cout<<**(classes) + 1<<endl;
+
     // deallocation
     for(int i = 0; i < 3; ++i){
         delete[] classes[i];
