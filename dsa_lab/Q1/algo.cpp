@@ -1,141 +1,77 @@
 #include <stdio.h>
-#include <time.h>
 #include <stdlib.h>
+#include <time.h>
 
-long long operations_n = 0;
-long long operations_n2 = 0;
-
-// O(n) algorithm 
-void sumN_On(int arr[], int n) {
-    operations_n = 0;
-    int runningSum = 0;
-    
-    for(int i = 0; i < n; i++) {
-        runningSum += arr[i];
-        operations_n++; 
-        
-        float average = (float)runningSum / (i + 1);
-        operations_n++; 
-    }
-}
-
-// O(n^2) algorithm 
-void sumN_On2(int arr[], int n) {
-    operations_n2 = 0;
-    
-    for(int i = 0; i < n; i++) {
-        int sum = 0;
-        
-        for(int j = 0; j <= i; j++) {
-            sum += arr[j];
-            operations_n2++;
-        }
-        
-        float average = (float)sum / (i + 1);
-        operations_n2++; // Division operation
-    }
-}
-
-void formation(int arr[], int n) {
-    srand(time(NULL));
-    int min = 1, max = 20;
-
-    for(int i = 0; i < n; i++) {
-        arr[i] = (rand() % (max - min + 1)) + min;
-    }
-}
-
-void writeCSVHeader(const char* filename) {
-    FILE *file = fopen(filename, "w");
-    if (file == NULL) {
-        printf("Error creating file!\n");
-        return;
-    }
-    
-    fprintf(file, "inputs,time(n),time(n^2)\n");
-    fclose(file);
-}
-
-void appendToCSV(const char* filename, int n, double time_n, double time_n2) {
-    FILE *file = fopen(filename, "a");
-    if (file == NULL) {
-        printf("Error opening file!\n");
-        return;
-    }
-    
-    fprintf(file, "%d,%.6f,%.6f\n", n, time_n, time_n2);
-    fclose(file);
-}
-
-double measureTime_On(int arr[], int n) {
-    clock_t start_time = clock();
-    sumN_On(arr, n);
-    clock_t end_time = clock();
-    return ((double)(end_time - start_time)) / CLOCKS_PER_SEC * 1000;
-}
-
-double measureTime_On2(int arr[], int n) {
-    clock_t start_time = clock();
-    sumN_On2(arr, n);
-    clock_t end_time = clock();
-    return ((double)(end_time - start_time)) / CLOCKS_PER_SEC * 1000;
-}
+int* avgsq(int*, int*, int);
+int* avgli(int*, int*, int);
 
 int main() {
-    // Define test sizes
-    int test_sizes[] = {10000, 20000, 30000, 40000, 50000};
-    int num_tests = sizeof(test_sizes) / sizeof(test_sizes[0]);
-    
-    const char* filename = "output.csv";
-    
-    printf("Starting performance comparison for O(n) vs O(n^2) algorithms...\n");
-    printf("Testing with array sizes: ");
-    for(int i = 0; i < num_tests; i++) {
-        printf("%d ", test_sizes[i]);
+    srand(time(NULL));
+    clock_t start, end;
+    FILE *file_sq = fopen("Lab1/SquaredTimeComplexity.csv", "w");
+    FILE *file_li = fopen("Lab1/LinearTimeComplexity.csv", "w");
+
+    if (!file_sq || !file_li) {
+        return 1;
     }
-    printf("\n\n");
-    
-    
-    writeCSVHeader(filename);
-    
-    // Test each array size
-    for(int i = 0; i < num_tests; i++) {
-        int n = test_sizes[i];
-        printf("Testing with array size: %d\n", n);
-        
-        // Create array and populate with random numbers
-        int *arr = (int*)malloc(n * sizeof(int));
-        formation(arr, n);
-        
-        // Measure O(n) algorithm
-        printf("  Running O(n) algorithm...");
-        fflush(stdout);
-        double time_n = measureTime_On(arr, n);
-        printf(" %.6f ms\n", time_n);
-        
-        // Measure O(n^2) algorithm
-        printf("  Running O(n^2) algorithm...");
-        fflush(stdout);
-        double time_n2 = measureTime_On2(arr, n);
-        printf(" %.6f ms\n", time_n2);
-        
-        // Write results to CSV
-        appendToCSV(filename, n, time_n, time_n2);
-        
-        printf("  Ratio (n^2/n): %.2fx\n\n", (time_n > 0) ? time_n2/time_n : 0);
-        
-        free(arr);
+
+    fprintf(file_sq, "n,time\n");
+    fprintf(file_li, "n,time\n");
+
+    for (int k = 1000; k <= 100000; k += 10000) {
+        int n = k;
+        int *X = (int*)calloc(n, sizeof(*X));
+        int *A = (int*)calloc(n, sizeof(*X));
+        int *B = (int*)calloc(n, sizeof(*X));
+
+        if (!X || !A || !B) {
+            free(X); free(A); free(B);
+            return 1;
+        }
+
+        for (int i = 0; i < n; ++i) {
+            X[i] = rand() % 100;
+        }
+
+        start = clock();
+        avgsq(X, A, n);
+        end = clock();
+        double time_sq = ((double)(end - start)) / CLOCKS_PER_SEC;
+        fprintf(file_sq, "%d,%.7f\n", n, time_sq);
+        printf("[Squared] n = %d -> %.7f sec\n", n, time_sq);
+
+        start = clock();
+        for (int i = 0; i < 1000; ++i) {
+            avgli(X, B, n);
+        }
+        end = clock();
+        double time_li = ((double)(end - start)) / CLOCKS_PER_SEC / 1000;
+        fprintf(file_li, "%d,%.9f\n", n, time_li);
+        printf("[Linear ] n = %d -> %.9f sec\n", n, time_li);
+
+        free(X); free(A); free(B);
     }
-    
-    printf("Performance comparison completed!\n");
-    printf("Results saved to: %s\n\n", filename);
-    
-    // Display summary
-    printf("CSV Format:\n");
-    printf("inputs,time(n),time(n^2)\n");
-    printf("1000,x.xxxxxx,y.yyyyyy\n");
-    printf("2000,x.xxxxxx,y.yyyyyy\n");
-    printf("...\n");
-    
+
+    fclose(file_sq);
+    fclose(file_li);
     return 0;
+}
+
+int* avgsq(int* X, int* A, int n) {
+    for (int i = 0; i < n; ++i) {
+        int sum = 0;
+        for (int j = 0; j <= i; ++j)
+            sum += X[j];
+        A[i] = sum / (i + 1);
+    }
+    return A;
+}
+
+int* avgli(int* X, int* A, int n) {
+    volatile int sum = 0;
+    for (int i = 0; i < n; ++i) {
+        sum += X[i];
+        A[i] = sum / (i + 1);
+    }
+    return A;
 }

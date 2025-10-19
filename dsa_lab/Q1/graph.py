@@ -1,40 +1,31 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 
-def load_data(filename='output.csv'):
-    """Load performance data from CSV file"""
-    try:
-        df = pd.read_csv(filename)
-        return df
-    except FileNotFoundError:
-        print(f"Error: {filename} not found!")
-        return None
+# Read CSVs with proper headers
+data1 = pd.read_csv("Lab1/LinearTimeComplexity.csv")
+data2 = pd.read_csv("Lab1/SquaredTimeComplexity.csv")
 
-def plot_algorithms(df):
-    """Plot both O(n) and O(n^2) algorithms"""
-    
-    # Graph 1: O(n) Algorithm
-    plt.figure(figsize=(10, 6))
-    plt.plot(df['inputs'], df['time(n)'], 'o-', linewidth=2, markersize=8, color='blue')
-    plt.xlabel('Input Size')
-    plt.ylabel('Time (ms)')
-    plt.title('O(n) Algorithm Performance')
-    plt.grid(True)
-    plt.show()
-    
-    # Graph 2: O(n^2) Algorithm  
-    plt.figure(figsize=(10, 6))
-    plt.plot(df['inputs'], df['time(n^2)'], 's-', linewidth=2, markersize=8, color='red')
-    plt.xlabel('Input Size')
-    plt.ylabel('Time (ms)')
-    plt.title('O(n²) Algorithm Performance')
-    plt.grid(True)
-    plt.show()
+# Create a figure with 2 subplots (1 row, 2 columns)
+fig, axs = plt.subplots(1, 2, figsize=(12, 5))
 
-def main():
-    df = load_data()
-    if df is not None:
-        plot_algorithms(df)
+# Plot for Linear Time Complexity
+axs[0].plot(data1['n'], data1['time'], marker='o', label="O(n)")
+axs[0].set_title("Linear Time Complexity")
+axs[0].set_xlabel("Input Size (n)")
+axs[0].set_ylabel("Time (s)")
+axs[0].grid(True)
+axs[0].legend()
 
-if __name__ == "__main__":
-    main()
+# Plot for Squared Time Complexity
+axs[1].plot(data2['n'], data2['time'], marker='o', color='orange', label="O(n²)")
+axs[1].set_title("Squared Time Complexity")
+axs[1].set_xlabel("Input Size (n)")
+axs[1].set_ylabel("Time (s)")
+axs[1].grid(True)
+axs[1].legend()
+
+# Adjust layout to prevent overlap
+plt.tight_layout()
+
+# Show the plots
+plt.show()
