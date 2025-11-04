@@ -1,0 +1,1 @@
+// function template for a friend function

@@ -5,7 +5,7 @@ using namespace std;
 
 void db_ptr(int rows, int cols){
     
-    int** dynamicArray = new int*[rows];
+    int** dynamicArray = new int*[rows];    // array of pointers
 
     for(int i = 0; i < rows; ++i){
         dynamicArray[i] = new int[cols];
