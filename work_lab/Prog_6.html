@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dynamic WebP & JS Graphics</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    #output {
+      margin: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      min-height: 50px;
+    }
+    canvas {
+      border: 2px solid black;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Dynamic Web Page & Graphics</h1>
+
+  <button onclick="addMsg()">Add Message</button>
+  <button onclick="draw()">Draw Graphics</button>
+
+  <div id="output"></div>
+
+  <canvas id="myCanvas" width="400" height="300"></canvas>
+
+  <script>
+    function addMsg() {
+      let output = document.getElementById("output");
+      let p = document.createElement("p");    
+      p.textContent = "This is a dynamically added message!";
+      output.appendChild(p);                  
+    }
+
+    function draw() {
+      let canvas = document.getElementById("myCanvas");
+      let ctx = canvas.getContext("2d");
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "lightblue";
+      ctx.fillRect(50, 50, 100, 80);
+
+      // Draw a circle
+      ctx.beginPath();
+      ctx.arc(250, 100, 50, 0, 2 * Math.PI);
+      ctx.fillStyle = "orange";
+      ctx.fill();
+    }
+  </script>
+
+</body>
+</html>

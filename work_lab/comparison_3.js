@@ -17,7 +17,7 @@ if(marks > 100 || marks < 0){
 }else if(marks > 60 && marks <= 75){
     console.log(`Grade C`);
 }else if(marks > 35 && marks <= 60){
-    console.log(`Grade C`);
+    console.log(`Grade D`);
 }else if(marks < 35){
     console.log(`Fail`)
 }

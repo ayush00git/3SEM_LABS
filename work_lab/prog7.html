@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Prog 7</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body class="flex flex-col items-center p-6 space-y-6 font-sans">
+
+  <h1 class="text-2xl font-bold">JavaScript Loops, Events, IFRAME and jQuery</h1>
+
+  <!-- Events + Loops -->
+  <div class="space-x-2">
+    <button onclick="countUp()" class="px-3 py-1 bg-blue-500 text-white rounded">Count Up</button>
+    <button onclick="countDown()" class="px-3 py-1 bg-green-500 text-white rounded">Count Down</button>
+  </div>
+  <div id="loopOutput" class="p-3 border rounded w-64 min-h-[50px] text-left"></div>
+
+  <!-- IFRAME -->
+  <h3 class="text-lg font-semibold">IFrame</h3>
+  <iframe src="https://www.wikipedia.com" class="w-80 h-48 border"></iframe>
+
+  <!-- jQuery Example -->
+  <h3 class="text-lg font-semibold">jQuery</h3>
+  <div class="space-x-2">
+    <button id="toggleBtn" class="px-3 py-1 bg-yellow-500 text-white rounded">Toggle Highlight</button>
+  </div>
+  <p id="jqText" class="mt-2">This text is styled</p>
+
+  <script>
+    // Loops
+    function countUp() {
+      let output = "";
+      for (let i = 1; i <= 5; i++) output +=  i + "<br>";
+      document.getElementById("loopOutput").innerHTML = output;
+    }
+
+    function countDown() {
+      let output = "";
+      let i = 5;
+      while (i > 0) output += i-- + "<br>";
+      document.getElementById("loopOutput").innerHTML = output;
+    }
+
+    // jQuery
+    $(function() {
+      $("#toggleBtn").click(() => $("#jqText").toggleClass("bg-yellow-200"));
+    });
+  </script>
+</body>
+</html>

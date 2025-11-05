@@ -18,10 +18,10 @@ console.log(rem);
 arr.push(7);  // inserts 7 at the end of the array
 console.log(arr[5]);
 
-const first = arr.shift(3);     // removes the first element from the array and return it as well
+const first = arr.shift();     // removes the first element from the array and return it as well
 console.log(first);
 
-console.log(arr.unshift(4));     // inserts 9 to the beginning of the array
+console.log(arr.unshift(4));     // inserts 4 to the beginning of the array
 
 console.log(arr.join(''));
 
