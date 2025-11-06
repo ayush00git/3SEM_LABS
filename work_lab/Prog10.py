@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
 # Starting URL
-start_url = "https://yap.deznov.space"
+start_url = "https://appteam.nith.ac.in"
 
 # Keep track of visited pages to avoid repeats
 visited = set()
