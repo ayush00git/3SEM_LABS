@@ -1,67 +1,80 @@
-#include<bits/stdc++.h>
+#include <iostream>
+#include <cstring>
+#include <cctype>   
 using namespace std;
 
 class Stack {
-    int arr[100];
+private:
     int top;
     int capacity;
-
-    public:
-
+    int* arr;
+public:
     Stack(int size) {
         capacity = size;
+        arr = new int[capacity];
         top = -1;
     }
-
-    void push(int x){
-        if(top == capacity - 1){
-            cout<<"Stack overflow"<<endl;
-        }else{
-            arr[++top] = x;
-        }
+    ~Stack() {
+        delete[] arr;
     }
 
-    void pop(int x){
-        if(top == -1){
-            cout<<"Stack Underflow"<<endl;
-        }else{
-            top--;
-        }
-    }
-
-    int peek(){
-        if(top == -1){
-            cout<<"Stack is empty"<<endl;
-            return -1;
-        }else{
-            return arr[top];
-        }
-    }
-
-    void display() {
-        if (top == -1) {
-            cout << "Stack is Empty\n";
+    void push(int value) {
+        if (top == capacity - 1) {
+            cout << "Stack Overflow\n";
             return;
-        }else{
-            cout<<"Stack elements: "<<endl;
-            for (int i = 0; i <= top; i++) {
-                cout << arr[i] << "\t";
+        }
+        arr[++top] = value;
+    }
+
+    int pop() {
+        if (top == -1) {
+            cout << "Stack Underflow\n";
+            return -1;
+        }
+        return arr[top--];
+    }
+};
+
+int evaluatePostfix(const char* expression) {
+    int len = strlen(expression);
+    Stack stack(len);
+
+    for (int i = 0; i < len; i++) {
+        char ch = expression[i];
+
+        if (ch == ' ') continue;
+
+        if (isdigit(ch)) {
+            int num = 0;
+            while (i < len && isdigit(expression[i])) {
+                num = num * 10 + (expression[i] - '0');
+                i++;
             }
-            cout << endl;
+            i--;
+            stack.push(num);
+        }
+
+        else if (ch == '+' || ch == '-' || ch == '*' || ch == '/') {
+            int val2 = stack.pop();
+            int val1 = stack.pop();
+
+            switch (ch) {
+                case '+': stack.push(val1 + val2); break;
+                case '-': stack.push(val1 - val2); break;
+                case '*': stack.push(val1 * val2); break;
+                case '/': stack.push(val1 / val2); break;
+            }
         }
     }
-};  
+    return stack.pop();
+}
 
 
 int main() {
+    char expression[100];
+    cout << "Enter postfix expression : ";
+    cin >> expression;
 
-    Stack s1(4);
-    s1.push(2);
-    s1.push(2);
-    s1.push(2);
-    s1.pop(2);
-    int top = s1.peek();
-    cout<<"Top element is: "<<top<<endl;
-
-    s1.display();
+    cout << "Result = " << evaluatePostfix(expression) << endl;
+    return 0;
 }
