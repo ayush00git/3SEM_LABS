@@ -13,6 +13,7 @@ class Names {
 
     public:
     Names(string s = "") : str(s) {}
+
     friend Names operator+ (const Names& n1, const Names& n2);
 
     void display() {
@@ -24,7 +25,6 @@ class Names {
 Names operator+ (const Names& n, const Names& m) {
     return Names(n.str + m.str);
 }
-
 
 class Parent {
     public:
@@ -47,7 +47,7 @@ class Child : public Parent {
     }
 };
 
-class Kid : public Child {
+class Kid : public Child { 
     public:
     void display() {
         cout<<"Kid class"<<endl;

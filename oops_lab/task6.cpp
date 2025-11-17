@@ -19,14 +19,13 @@ bool nullCounts(char ch[]){
     int n = strlen(ch);
     int cnt = 0;
     int i = 0;
+    
     while(ch[i] != '\0'){
         cnt++;
         i++;
     }
 
-    if(n == cnt){
-        return true;
-    }
+    if(n == cnt) return true;
     return false;
 }
 
