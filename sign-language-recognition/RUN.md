@@ -122,6 +122,36 @@ Calculator mode: sign digits for the first number, hold "Best of Luck" to confir
 for the operator (1 `+`, 2 `-`, 3 `*`, 4 `/`, 5 `%`, 6 `**`, 7 `>>`, 8 `<<`, 9 `&`, 0 `|`),
 then the second number and "Best of Luck" again to compute. Sign "C" to clear.
 
+## 8. Phone mode: phone camera and screen
+
+Your phone becomes the camera and the screen. The laptop still does the recognition: same hand
+segmentation, same model and the same 70% rule as `final.py`. The phone shows the prediction,
+the top 3 guesses, the word being built and the hand mask, and speaks the words.
+
+1. Connect the phone and the laptop to the **same Wi-Fi**.
+2. On the laptop, from `Code/` with the venv active:
+   ```bash
+   python phone_server.py           # prints an address like https://192.168.1.23:8443
+   ```
+   The first run creates a self-signed HTTPS certificate in `phone_cert/` (needs `openssl`,
+   which Ubuntu and Fedora already have). Phone browsers only allow the camera over HTTPS.
+3. On the phone, open that address in Chrome (Android) or Safari (iPhone). You'll see
+   "Your connection is not private": tap **Advanced** -> **Proceed**. This is expected for a
+   certificate the laptop made itself.
+4. Tap **Start camera** and allow camera access.
+5. Tap **Calibrate**, cover all the small squares with your hand, tap **Capture hand**, and check
+   that the mask (bottom left) shows a clean white hand on black. Then tap **Done**. The phone gets
+   its own calibration (`hist_phone`) because its camera sees colours differently from the laptop's.
+6. Sign inside the green box. Hold a sign for 1 second to add it to the word (the bar fills up).
+   Take your hand out of the box to say the word.
+
+Buttons: **Voice** on/off, **Flip cam** (front/back camera), **Clear**. Calculator mode is
+laptop-only (`final.py`).
+
+If the phone can't load the page: check both devices are on the same Wi-Fi network (not a guest
+network). If the firewall is on, open the port: Ubuntu `sudo ufw allow 8443/tcp`, Fedora
+`sudo firewall-cmd --add-port=8443/tcp`. Use `--port` to pick another port.
+
 ### Wayland (Fedora GNOME)
 
 If no OpenCV windows appear, or you see a Qt "wayland" plugin warning, run through XWayland:
@@ -178,4 +208,5 @@ QT_QPA_PLATFORM=xcb python final.py
   - Labels are read from `gesture_db.db` once at startup, not once per frame.
   - Mode keys now match the docs: `t` calculator, `c` text. The code had them the other way round.
 - `create_gestures.py`: `--camera`, read checks, `q` to stop, numpy `hist`, parameterized SQL.
+- New `phone_server.py` + `phone/index.html`: phone mode (step 8). Python standard-library HTTPS server, no new packages.
 - New `check_dataset.py`: verifies image size, counts and ids against `gesture_db.db`.

@@ -13,3 +13,5 @@ Code/test_labels
 Code/*.keras
 Code/hist
 Code/train.log
+Code/hist_phone
+Code/phone_cert/
