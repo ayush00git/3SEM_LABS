@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+# downloaded on first run
+models/
+# self-signed HTTPS certificate made by serve.py
+certs/
+# your own recordings and the model trained on them
+data/
+model.json
+results/

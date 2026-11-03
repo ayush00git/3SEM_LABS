@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>Sign Language</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #1a1d24; --line: #2a2f3a; --text: #eef1f5; --dim: #8a93a3;
+    --accent: #3ddc84; --warn: #ffb020; --err: #ff5d5d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+  main { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  .stage { position: relative; background: #000; border-radius: 14px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; }
+  video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .badge { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.6); color: var(--accent);
+    padding: 3px 8px; border-radius: 8px; font: 600 13px/1.3 ui-monospace, monospace; }
+  .badge.right { left: auto; right: 8px; color: var(--dim); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+  .predline { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .pred { font-size: 44px; font-weight: 800; letter-spacing: .02em; overflow-wrap: anywhere; }
+  .pred.dim { color: var(--dim); font-size: 26px; font-weight: 600; }
+  #conf { color: var(--dim); font-size: 18px; white-space: nowrap; }
+  .hold { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  #hold-bar { height: 100%; width: 0; background: var(--accent); transition: width 60ms linear; }
+  #top3 { margin-top: 8px; display: grid; gap: 4px; min-height: 72px; }
+  .row { display: grid; grid-template-columns: 5.5em 1fr 3em; align-items: center; gap: 8px; font-size: 14px; }
+  .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .fill { display: block; height: 100%; background: #6aa8ff; }
+  .pct { text-align: right; color: var(--dim); }
+  .label { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+  #word { font-size: 30px; font-weight: 700; min-height: 1.3em; overflow-wrap: anywhere; }
+  #said { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; min-height: 1.6em; }
+  #said li { background: var(--line); border-radius: 8px; padding: 2px 8px; }
+  #said li:first-child { background: #24493a; }
+  .buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 6px; min-height: 48px; touch-action: manipulation; }
+  button:active { background: var(--line); }
+  #start-screen { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px; padding: 24px; text-align: center; z-index: 10; }
+  #start-screen[hidden] { display: none; }
+  #start-screen h1 { margin: 0; font-size: 26px; }
+  #start-screen p { margin: 0; color: var(--dim); max-width: 26em; }
+  #start { background: var(--accent); color: #062b16; font-weight: 800; font-size: 22px; border: 0;
+    padding: 16px 48px; border-radius: 16px; }
+  #start:disabled { opacity: .5; }
+  #status { color: var(--dim); min-height: 1.4em; }
+  .error { white-space: pre-line; background: #3a1416; border: 1px solid var(--err); color: #ffd6d6; border-radius: 12px;
+    padding: 10px 12px; max-width: 32em; text-align: left; }
+  #app-error { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 20; margin: 0 auto; }
+</style>
+</head>
+<body>
+<div id="start-screen">
+  <h1>✋ Sign Language</h1>
+  <p>Hold a sign steady for 1 second to add it to the word. Take your hand away to say the word.</p>
+  <button id="start">Start</button>
+  <div id="status">Loading…</div>
+  <div id="error" class="error" role="alert" hidden></div>
+</div>
+
+<main>
+  <div class="stage">
+    <canvas id="view" width="640" height="480"></canvas>
+    <video id="video" playsinline muted autoplay></video>
+    <span id="fps" class="badge">0 FPS</span>
+    <span id="delegate" class="badge right"></span>
+  </div>
+
+  <section class="panel" aria-live="polite">
+    <div class="predline"><span id="pred" class="pred dim">show your hand</span><span id="conf"></span></div>
+    <div class="hold"><div id="hold-bar"></div></div>
+    <div id="top3"></div>
+  </section>
+
+  <section class="panel">
+    <div class="label">Word</div>
+    <div id="word">&nbsp;</div>
+    <div class="label" style="margin-top:8px">Said</div>
+    <ul id="said"></ul>
+  </section>
+
+  <div class="buttons">
+    <button id="btn-voice" aria-pressed="true">🔊 Voice</button>
+    <button id="btn-flip">🔄 Flip</button>
+    <button id="btn-back" aria-label="Delete last character">⌫</button>
+    <button id="btn-clear">Clear</button>
+  </div>
+</main>
+
+<div id="app-error" class="error" role="alert" hidden></div>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>
