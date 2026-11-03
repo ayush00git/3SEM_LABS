@@ -16,14 +16,14 @@ how likely that colour is to be your hand. Compared with the original version it
   image, so an empty box still produced a "hand").
 
 The blur and median steps that give the masks their shape are unchanged, so masks still look
-like the training images. The file is a plain float32 numpy array of shape (180, 256), loaded
-with allow_pickle=False.
+like the training images. The file is a plain float32 numpy array (180 rows of hue x 256 of
+saturation, plus one marker row), saved and loaded with allow_pickle=False.
 """
 import cv2
 import numpy as np
 
 V_MIN = 40            # pixels darker than this (0-255) have meaningless hue; never "hand"
-THRESH = 110          # fixed mask threshold on the smoothed 0-255 skin likelihood
+THRESH = 60             # fixed mask threshold on the smoothed 0-255 hand likelihood (tuned on test scenes)
 SIGMA_H, SIGMA_S = 2.0, 6.0   # histogram smoothing, in hue (0-179) and saturation (0-255) units
 BOX = 300
 DISC = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10, 10)).astype(np.float32)
@@ -66,13 +66,20 @@ def build_hist(skin_pixels, background_pixels=None):
 		lut *= skin / (skin + bg + 1e-12)        # P(hand | colour), equal priors
 	return (lut * 255).astype(np.float32)
 
+FORMAT_VERSION = 2   # stored in an extra last row, so old-style files are recognised and refused
+
+def save_hist(path, hist):
+	marker = np.full((1, 256), FORMAT_VERSION, np.float32)
+	with open(path, "wb") as f:
+		np.save(f, np.vstack([hist.astype(np.float32), marker]), allow_pickle=False)
+
 def load_hist(path):
-	"""Load a calibration made by this module. Refuses pickles and the old 0-255 histogram
-	format would still load, but recalibrating is recommended."""
-	hist = np.load(path, allow_pickle=False)
-	if hist.shape != (180, 256):
-		raise ValueError("unexpected calibration shape %s" % (hist.shape,))
-	return hist.astype(np.float32)
+	"""Load a calibration saved by save_hist. Raises ValueError for pickles and for files
+	from the old calibration method (same colours, different meaning)."""
+	data = np.load(path, allow_pickle=False)
+	if data.shape != (181, 256) or not np.all(data[180] == FORMAT_VERSION):
+		raise ValueError("calibration file is from an older version")
+	return data[:180].astype(np.float32)
 
 def mask(img, hist, box_x, box_y):
 	"""Binary hand mask (uint8 0/255) of the BOX x BOX region at (box_x, box_y)."""

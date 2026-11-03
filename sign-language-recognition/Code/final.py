@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
+import hand_segment as HS
 
 MODEL_PATH = 'cnn_model_keras2.keras'
 
@@ -77,9 +78,9 @@ def get_hand_hist():
 	# Saved by set_hand_histogram.py as a plain numpy array; allow_pickle=False means
 	# an old pickled 'hist' is rejected instead of being executed.
 	try:
-		return np.load("hist", allow_pickle=False)
+		return HS.load_hist("hist")
 	except ValueError:
-		die("'hist' is in the old pickle format. Delete it and run set_hand_histogram.py again.")
+		die("'hist' is from an old version. Run set_hand_histogram.py again.")
 
 def get_image_size():
 	# Read the input size from the trained model so the dataset is not needed at run time.
@@ -210,18 +211,8 @@ def draw_fps(img):
 
 def get_img_contour_thresh(img):
 	img = cv2.flip(img, 1)
-	imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-	dst = cv2.calcBackProject([imgHSV], [0, 1], hist, [0, 180, 0, 256], 1)
-	disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(10,10))
-	cv2.filter2D(dst,-1,disc,dst)
-	blur = cv2.GaussianBlur(dst, (11,11), 0)
-	blur = cv2.medianBlur(blur, 15)
-	thresh = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
-	thresh = cv2.merge((thresh,thresh,thresh))
-	thresh = cv2.cvtColor(thresh, cv2.COLOR_BGR2GRAY)
-	thresh = thresh[y:y+h, x:x+w]
-	contours = cv2.findContours(thresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
-	return img, contours, thresh
+	thresh = HS.mask(img, hist, x, y)
+	return img, HS.contours(thresh), thresh
 
 def say_text(text):
 	if is_voice_on:

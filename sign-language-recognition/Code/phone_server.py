@@ -17,6 +17,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
+import hand_segment as HS
 
 MODEL_PATH = 'cnn_model_keras2.keras'
 HIST_PATH = 'hist_phone'          # separate from the laptop 'hist': different camera, different colours
@@ -44,11 +45,12 @@ conn.close()
 
 lock = threading.Lock()           # one frame at a time through OpenCV/TF state
 hist = None
+skin_px, bg_px = None, None   # last calibration samples from the phone
 if os.path.exists(HIST_PATH):
 	try:
-		hist = np.load(HIST_PATH, allow_pickle=False)
+		hist = HS.load_hist(HIST_PATH)
 	except ValueError:
-		print("WARNING: %s is not a numpy array; calibrate again from the phone." % HIST_PATH)
+		print("WARNING: %s is from an old version; calibrate again from the phone." % HIST_PATH)
 
 def decode(body):
 	img = cv2.imdecode(np.frombuffer(body, np.uint8), cv2.IMREAD_COLOR)
@@ -64,18 +66,10 @@ def box_from_query(q, img):
 	return x, y
 
 def segment(img, x, y):
-	"""Same steps as final.py get_img_contour_thresh. The phone already mirrors the
+	"""Same segmentation as final.py (hand_segment.py). The phone already mirrors the
 	front camera, so there is no flip here."""
-	imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-	dst = cv2.calcBackProject([imgHSV], [0, 1], hist, [0, 180, 0, 256], 1)
-	disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10, 10))
-	cv2.filter2D(dst, -1, disc, dst)
-	blur = cv2.GaussianBlur(dst, (11, 11), 0)
-	blur = cv2.medianBlur(blur, 15)
-	thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-	thresh = thresh[y:y+BOX, x:x+BOX]
-	contours = cv2.findContours(thresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
-	return thresh, contours
+	thresh = HS.mask(img, hist, x, y)
+	return thresh, HS.contours(thresh)
 
 def predict(thresh, contour):
 	"""Same crop, padding and 70% rule as final.py get_pred_from_contour."""
@@ -111,23 +105,20 @@ def handle_predict(img, x, y):
 			out["hand"] = "small"
 	return out
 
-def handle_calibrate(img, x, y):
-	"""Same 5x10 grid of 10px squares as set_hand_histogram.py, placed at the same spot
-	inside the hand box (120, 40 from its top-left corner)."""
-	global hist
-	sx, sy = x + 120, y + 40
-	rows = []
-	for i in range(10):
-		yy = sy + i * 20
-		rows.append(np.hstack([img[yy:yy+10, sx + j*20:sx + j*20 + 10] for j in range(5)]))
-	crop = np.vstack(rows)
-	h = cv2.calcHist([cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)], [0, 1], None, [180, 256], [0, 180, 0, 256])
-	cv2.normalize(h, h, 0, 255, cv2.NORM_MINMAX)
-	hist = h
-	with open(HIST_PATH, "wb") as f:
-		np.save(f, hist, allow_pickle=False)
+def handle_calibrate(img, x, y, kind):
+	"""kind='background': the box is empty. kind='hand': the hand covers the squares
+	(same grid as set_hand_histogram.py). The frame has no overlays drawn on it."""
+	global hist, skin_px, bg_px
+	if kind == "background":
+		bg_px = img[y:y+BOX, x:x+BOX].reshape(-1, 3).copy()
+		if skin_px is None:
+			return {"ok": True, "need": "hand"}
+	else:
+		skin_px = HS.squares_pixels(img, x, y)
+	hist = HS.build_hist(skin_px, bg_px)
+	HS.save_hist(HIST_PATH, hist)
 	thresh, _ = segment(img, x, y)
-	return {"ok": True, "mask": png_data_url(thresh)}
+	return {"ok": True, "mask": png_data_url(thresh), "background": bg_px is not None}
 
 class Handler(BaseHTTPRequestHandler):
 	timeout = 30   # drop idle or stuck connections
@@ -161,7 +152,11 @@ class Handler(BaseHTTPRequestHandler):
 			x, y = box_from_query(parse_qs(url.query), img)
 			t = time.perf_counter()
 			with lock:
-				out = (handle_predict if url.path == "/predict" else handle_calibrate)(img, x, y)
+				if url.path == "/predict":
+					out = handle_predict(img, x, y)
+				else:
+					kind = parse_qs(url.query).get("kind", ["hand"])[0]
+					out = handle_calibrate(img, x, y, "background" if kind == "background" else "hand")
 			out["ms"] = round((time.perf_counter() - t) * 1000, 1)
 		except ValueError as e:
 			out = {"ok": False, "error": str(e)}

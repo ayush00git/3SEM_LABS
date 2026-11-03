@@ -92,20 +92,22 @@ python evaluate.py                      # test accuracy, per-class report
 
 The data comes from one signer, so treat this as an upper bound for your own hand.
 
-## 6. Calibrate your hand histogram (you, at the webcam)
+## 6. Calibrate for your hand, camera and room (you, at the webcam)
 
 ```bash
 python set_hand_histogram.py            # add --camera 1 etc. if 0 is not your webcam
 ```
 
-1. Plain background, even bright light, no skin-coloured things behind you.
-2. Hold your hand so it covers **every** small green square on the right.
-3. Press `c`. A **Thresh** window opens: you want a clean white hand on black.
-   If it is noisy or patchy, move or re-light and press `c` again.
-4. Press `s` to save `hist` (pressing `s` before `c` just reminds you to capture first).
-   `q` quits without saving.
+1. Plain background, even bright light, long sleeves if you can.
+2. Take your hand **out** of the green box and press `b` (background). Optional, but it teaches
+   the calibration which colours are *not* your hand, so skin-like walls or wood stop lighting up.
+3. Cover **all** the small squares with your hand and press `c`.
+4. The **Thresh** window shows the mask the demo will use: you want a clean white hand on black,
+   and pure black when your hand leaves the box. If not, press `b`/`c` again.
+5. Press `s` to save `hist` (pressing `s` before `c` just reminds you). `q` quits without saving.
 
-`hist` is saved as a plain numpy array. Old pickled `hist` files are refused, never loaded.
+Recalibrate whenever the lighting or background changes. Calibration files from older versions
+of this project (or the upstream repo) are refused with a message: just run this step again.
 
 ## 7. Live demo
 
@@ -139,9 +141,10 @@ the top 3 guesses, the word being built and the hand mask, and speaks the words.
    "Your connection is not private": tap **Advanced** -> **Proceed**. This is expected for a
    certificate the laptop made itself.
 4. Tap **Start camera** and allow camera access.
-5. Tap **Calibrate**, cover all the small squares with your hand, tap **Capture hand**, and check
-   that the mask (bottom left) shows a clean white hand on black. Then tap **Done**. The phone gets
-   its own calibration (`hist_phone`) because its camera sees colours differently from the laptop's.
+5. Tap **Calibrate**. Take your hand out of the box and tap **1. Background**, then cover all the
+   small squares with your hand and tap **2. Hand**. Check that the mask (bottom left) shows a clean
+   white hand on black, then tap **Done**. The phone gets its own calibration (`hist_phone`)
+   because its camera sees colours differently from the laptop's.
 6. Sign inside the green box. Hold a sign for 1 second to add it to the word (the bar fills up).
    Take your hand out of the box to say the word.
 
@@ -209,4 +212,23 @@ QT_QPA_PLATFORM=xcb python final.py
   - Mode keys now match the docs: `t` calculator, `c` text. The code had them the other way round.
 - `create_gestures.py`: `--camera`, read checks, `q` to stop, numpy `hist`, parameterized SQL.
 - New `phone_server.py` + `phone/index.html`: phone mode (step 8). Python standard-library HTTPS server, no new packages.
+- New `hand_segment.py`, used by every webcam script and the phone server. It replaces the original
+  hand segmentation, which had three faults:
+  - Calibration sampled skin *after* drawing the green guide squares on the frame, so 3.8% of the
+    sample was pure green. Green became the histogram's peak, squashing real skin to ~27/255.
+  - The 10x10 smoothing filter summed instead of averaging, so faint background matches (4/255)
+    became full white.
+  - Otsu thresholding always splits the image, so an empty box still showed a "hand"
+    (49% of a noise-only frame).
+
+  The new version samples a clean frame, can learn the empty background (`b`), smooths the colour
+  histogram, ignores very dark pixels, averages, and uses a fixed threshold. On 1,760 synthetic test
+  hands (4 skin tones x 5 backgrounds, lighting drift):
+
+  | | mask match | sign right | empty box shows a "hand" |
+  |---|---|---|---|
+  | old | 0.94 | 97.5% | 3.3% |
+  | new | 0.96 | 98.6% | 0% |
+
+  It only processes the hand box instead of the whole frame, so per-frame time dropped from ~33 ms to ~15 ms.
 - New `check_dataset.py`: verifies image size, counts and ids against `gesture_db.db`.

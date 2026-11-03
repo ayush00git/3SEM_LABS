@@ -2,6 +2,7 @@ import argparse
 import cv2
 import numpy as np
 import os, sqlite3, random
+import hand_segment as HS
 
 image_x, image_y = 50, 50
 
@@ -9,9 +10,9 @@ def get_hand_hist():
 	if not os.path.exists("hist"):
 		raise SystemExit("ERROR: 'hist' not found. Run set_hand_histogram.py first.")
 	try:
-		return np.load("hist", allow_pickle=False)
+		return HS.load_hist("hist")
 	except ValueError:
-		raise SystemExit("ERROR: 'hist' is in the old pickle format. Run set_hand_histogram.py again.")
+		raise SystemExit("ERROR: 'hist' is from an old version. Run set_hand_histogram.py again.")
 
 def init_create_folder_database():
 	# create the folder and database if not exist
@@ -59,17 +60,8 @@ def store_images(g_id, camera):
 			print("ERROR: camera stopped returning frames.")
 			break
 		img = cv2.flip(img, 1)
-		imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-		dst = cv2.calcBackProject([imgHSV], [0, 1], hist, [0, 180, 0, 256], 1)
-		disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(10,10))
-		cv2.filter2D(dst,-1,disc,dst)
-		blur = cv2.GaussianBlur(dst, (11,11), 0)
-		blur = cv2.medianBlur(blur, 15)
-		thresh = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
-		thresh = cv2.merge((thresh,thresh,thresh))
-		thresh = cv2.cvtColor(thresh, cv2.COLOR_BGR2GRAY)
-		thresh = thresh[y:y+h, x:x+w]
-		contours = cv2.findContours(thresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
+		thresh = HS.mask(img, hist, x, y)
+		contours = HS.contours(thresh)
 
 		if len(contours) > 0:
 			contour = max(contours, key = cv2.contourArea)

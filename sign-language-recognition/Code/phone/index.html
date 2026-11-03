@@ -45,7 +45,7 @@
   #calib { display: none; }
   body.calibrating #calib { display: grid; }
   body.calibrating #normal { display: none; }
-  #calib { grid-template-columns: 1fr 1fr; }
+  #calib { grid-template-columns: 1fr 1fr 1fr; }
 </style>
 </head>
 <body>
@@ -78,7 +78,8 @@
   <button id="clearBtn">Clear</button>
 </div>
 <div class="row" id="calib">
-  <button class="primary" id="captureBtn">Capture hand</button>
+  <button id="bgBtn">1. Background</button>
+  <button class="primary" id="captureBtn">2. Hand</button>
   <button id="doneBtn">Done</button>
 </div>
 <div id="msg"></div>
@@ -144,11 +145,11 @@
     }
   }
 
-  function send(path) {
+  function send(path, extra = '') {
     return new Promise((resolve, reject) => {
       work.toBlob(async blob => {
         try {
-          const r = await fetch(`${path}?x=${box.x}&y=${box.y}`, {
+          const r = await fetch(`${path}?x=${box.x}&y=${box.y}${extra}`, {
             method: 'POST', body: blob, headers: {'Content-Type': 'image/jpeg'}
           });
           resolve(await r.json());
@@ -218,7 +219,7 @@
     document.body.classList.toggle('calibrating', on);
     curText = ''; word = ''; $('word').textContent = ''; $('hold').style.width = '0';
     $('predText').innerHTML = '&nbsp;'; $('predConf').textContent = ''; $('top').textContent = '';
-    if (on) msg('Cover all the small squares with your hand, then tap Capture hand. The mask (bottom left) should show a clean white hand.');
+    if (on) msg('1. Take your hand out of the green box and tap Background. 2. Cover all the small squares with your hand and tap Hand. The mask (bottom left) should show a clean white hand.');
   }
 
   $('startBtn').onclick = async () => {
@@ -237,12 +238,22 @@
   };
   $('calBtn').onclick = () => setCalibrating(true);
   $('doneBtn').onclick = () => { setCalibrating(false); msg(''); };
+  $('bgBtn').onclick = async () => {
+    try {
+      const r = await send('/calibrate', '&kind=background');
+      if (!r.ok) return msg(r.error, true);
+      if (r.mask) $('mask').src = r.mask;
+      msg(r.need === 'hand' ? 'Background captured. Now cover the small squares with your hand and tap Hand.'
+                            : 'Background updated. The mask should now be black where there is no hand.');
+    } catch (e) { msg('Could not reach the laptop.', true); }
+  };
   $('captureBtn').onclick = async () => {
     try {
-      const r = await send('/calibrate');
+      const r = await send('/calibrate', '&kind=hand');
       if (!r.ok) return msg(r.error, true);
       $('mask').src = r.mask;
-      msg('Captured. If the mask shows a clean white hand on black, tap Done. Otherwise adjust and capture again.');
+      msg('Hand captured' + (r.background ? '' : ' (tip: tap Background with the box empty for a cleaner mask)') +
+          '. If the mask shows a clean white hand on black, tap Done. Otherwise adjust and capture again.');
     } catch (e) { msg('Could not reach the laptop.', true); }
   };
   $('voiceBtn').onclick = () => {
