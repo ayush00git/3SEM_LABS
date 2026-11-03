@@ -6,9 +6,10 @@ Windows notes are at the end. All `python` commands after step 1 run from inside
 Based on [Atul-Koundal/sign-language-recognition](https://github.com/Atul-Koundal/sign-language-recognition)
 at commit `4f40552`, with the fixes listed in "What was changed" at the bottom.
 
-Reference run (4-core Xeon VM, CPU only): training 16-34 s per epoch, 4 min 55 s for 15 epochs,
-~1.9 GB RAM; best val accuracy 99.90%, **test accuracy 99.91%** (8 / 9000 wrong). Live-loop processing
-~33 ms per frame (~30 FPS ceiling) headless. A laptop CPU may be slower but should stay well under 45 minutes.
+Reference run (4-core Xeon VM, CPU only): training 15-18 s per epoch, 4 min 20 s for 15 epochs,
+~1.9 GB RAM; best val accuracy 99.78%, **test accuracy 99.81%** (17 / 9000 wrong; weakest T 98.0%,
+7 98.5%). Three more runs gave 99.53-99.70%. Live-loop processing ~33 ms per frame (~30 FPS ceiling),
+measured headless. A laptop CPU may be slower but should stay well under 45 minutes.
 
 A trained `Code/cnn_model_keras2.keras` is included, so you can jump to step 6 (calibrate) and
 step 7 (demo) right after step 1. Steps 2-5 rebuild it from scratch.
@@ -163,6 +164,9 @@ QT_QPA_PLATFORM=xcb python final.py
 ## What was changed (vs upstream `4f40552`)
 
 - `cnn_model_train.py`: softmax size and one-hot encoding both use max class id + 1, so a missing class folder can't make them disagree.
+- `cnn_model_train.py`: a `Rescaling(1/255)` first layer (no weights; conv/dense layers unchanged). On raw 0-255 pixels, training was a
+  coin flip: one run reached 99.9%, the next stalled at 7.7% val accuracy. With rescaling, 4 of 4 runs reached 99.5-99.8% test accuracy.
+  It is inside the saved model, so `evaluate.py` and `final.py` still feed raw pixels.
 - `set_hand_histogram.py`: `--camera` (default 0, was "try 1 then 0"); checks every `cam.read()`; `s` before `c` no longer crashes; `q` quits; saves `hist` as a plain numpy array, not a pickle.
 - Bundled `Code/hist` deleted: it was a pickle from another machine (unsafe to load) and tuned to someone else's skin and lighting.
 - `final.py`:

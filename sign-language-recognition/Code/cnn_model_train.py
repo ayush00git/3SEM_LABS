@@ -9,6 +9,7 @@ from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Conv2D
 from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import Rescaling
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint
 
@@ -34,7 +35,11 @@ image_x, image_y = get_image_size()
 def cnn_model():
 	num_of_classes = get_num_of_classes()
 	model = Sequential()
-	model.add(Conv2D(16, (2,2), input_shape=(image_x, image_y, 1), activation='relu'))
+	# Scale 0-255 pixels to 0-1 inside the model. Without it SGD often stalls near chance
+	# (one of two CPU runs reached only 7.7% val accuracy). Being part of the saved model,
+	# evaluate.py and final.py keep feeding raw pixels unchanged.
+	model.add(Rescaling(1./255, input_shape=(image_x, image_y, 1)))
+	model.add(Conv2D(16, (2,2), activation='relu'))
 	model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding='same'))
 	model.add(Conv2D(32, (3,3), activation='relu'))
 	model.add(MaxPooling2D(pool_size=(3, 3), strides=(3, 3), padding='same'))
