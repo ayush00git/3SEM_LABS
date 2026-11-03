@@ -73,6 +73,7 @@ class HandTracker:
         self._landmarker = vision.HandLandmarker.create_from_options(options)
         self._video = mode == "video"
         self._last_ts = -1
+        self._votes = []      # recent (label, score) while the same hand stays in view
 
     def detect(self, frame_bgr):
         """Return a Hand or None. frame_bgr is an OpenCV BGR image."""
@@ -87,11 +88,21 @@ class HandTracker:
         else:
             result = self._landmarker.detect(image)
         if not result.hand_landmarks:
+            self._votes = []
             return None
         img = np.array([[p.x, p.y, p.z] for p in result.hand_landmarks[0]], np.float32)
         world = np.array([[p.x, p.y, p.z] for p in result.hand_world_landmarks[0]], np.float32)
         cat = result.handedness[0][0]
-        return Hand(img, world, cat.category_name, cat.score)
+        handedness = cat.category_name
+        if self._video:
+            # MediaPipe sometimes flips Left/Right for a frame or two. A flip mirrors the
+            # features, so take a score-weighted vote over the last 15 frames instead.
+            # web/app.js does the same.
+            self._votes = (self._votes + [(handedness, cat.score)])[-15:]
+            right = sum(s for h, s in self._votes if h == "Right")
+            left = sum(s for h, s in self._votes if h == "Left")
+            handedness = "Right" if right >= left else "Left"
+        return Hand(img, world, handedness, cat.score)
 
     def close(self):
         self._landmarker.close()
@@ -133,8 +144,8 @@ class Classifier:
             x = x @ W + b
             if i < len(self.layers) - 1:
                 x = np.maximum(x, 0)
-        e = np.exp(x - x.max())
-        return e / e.sum()
+        e = np.exp(x - x.max(axis=-1, keepdims=True))
+        return e / e.sum(axis=-1, keepdims=True)
 
 
 class Speaker:
