@@ -35,7 +35,16 @@ Every new terminal: `cd 3SEM_LABS/sign_language_mediapipe && source .venv/bin/ac
 python collect.py
 ```
 
-__COLLECT__
+A window shows your camera with the hand points drawn.
+
+1. Press a letter or digit key (for example `A`). After a 2-second countdown it records 200 frames
+   of that sign (only frames where it sees your hand count). Keep your hand still-ish, but move it
+   a little: closer, further, slightly tilted.
+2. Repeat for every sign you want. Recording a sign again adds more samples, which helps.
+3. `Backspace` deletes the last recording. `Esc` quits. Recordings are saved to
+   `data/landmarks.csv` as you go, so you can stop and continue later.
+
+`--samples 300` records more per sign; `--camera 1` picks another webcam.
 
 ## 2. Train (seconds)
 
@@ -43,7 +52,8 @@ __COLLECT__
 python train.py
 ```
 
-__TRAIN__
+Prints the accuracy on held-out frames and which signs get confused, saves
+`results/confusion_matrix.png`, and writes `model.json`. Retrain any time you record more.
 
 ## 3. Live on the laptop
 
@@ -51,7 +61,11 @@ __TRAIN__
 python live.py
 ```
 
-__LIVE__
+Show a sign and hold it for 1 second: it is added to the word (the green bar fills up) and spoken.
+Take your hand out of view to finish the word and hear it.
+
+Keys: `q` quit, `v` voice on/off, `c` clear, `Backspace` delete the last letter.
+Options: `--camera N`, `--no-voice`, `--threshold 0.7` (minimum confidence), `--hold 1.0` (seconds).
 
 ## 4. Live on the phone
 
@@ -61,7 +75,14 @@ The phone runs MediaPipe and your model in its own browser; the laptop only serv
 python serve.py
 ```
 
-__PHONE__
+1. Phone and laptop on the **same Wi-Fi**. The phone also needs internet (it loads MediaPipe's
+   web library from jsDelivr).
+2. Open the `https://...:8443` address it prints, in Chrome (Android) or Safari (iPhone).
+3. "Connection is not private" -> **Advanced -> Proceed** (the laptop made its own certificate).
+4. Tap **Start**, allow the camera. Buttons: Voice, Flip cam, ⌫, Clear.
+
+Retrain on the laptop and just reload the page to use the new model. If the page won't load,
+the firewall may be blocking it: `sudo ufw allow 8443/tcp`.
 
 ## Tips
 
