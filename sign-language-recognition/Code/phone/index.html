@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111418">
+<title>Sign Recognition</title>
+<style>
+  :root {
+    --bg: #111418; --panel: #1b2027; --text: #eef1f4; --muted: #9aa4b1;
+    --accent: #3ddc97; --warn: #ffb547; --bad: #ff6b6b; --box: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 10px; font-weight: 600; }
+  .stage { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
+  canvas#view { display: block; width: 100%; height: auto; }
+  #mask { position: absolute; left: 8px; bottom: 8px; width: 28%; max-width: 150px; aspect-ratio: 1;
+    border: 2px solid rgba(255,255,255,.6); border-radius: 8px; background: #000; image-rendering: pixelated; }
+  .hud { position: absolute; left: 8px; top: 8px; font-size: 13px; background: rgba(0,0,0,.55);
+    padding: 3px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+  .pred { display: flex; align-items: baseline; gap: 12px; margin: 12px 0 4px; min-height: 64px; }
+  #predText { font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: .02em; }
+  #predConf { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .bar { height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; }
+  #hold { height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
+  .card { background: var(--panel); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+  .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  #word { font-size: 30px; font-weight: 600; min-height: 42px; word-break: break-word; }
+  #history { font-size: 18px; min-height: 26px; word-break: break-word; }
+  #top { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  button { font: inherit; font-size: 15px; padding: 12px 6px; border-radius: 10px; border: 0;
+    background: var(--panel); color: var(--text); }
+  button.primary { background: var(--accent); color: #062b1c; font-weight: 600; }
+  button.on { outline: 2px solid var(--accent); }
+  #msg { margin-top: 10px; color: var(--warn); min-height: 22px; }
+  #msg.bad { color: var(--bad); }
+  #start { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px; padding: 24px; text-align: center; z-index: 5; }
+  #start p { color: var(--muted); max-width: 420px; margin: 0; }
+  #start button { padding: 14px 28px; font-size: 18px; }
+  #calib { display: none; }
+  body.calibrating #calib { display: grid; }
+  body.calibrating #normal { display: none; }
+  #calib { grid-template-columns: 1fr 1fr 1fr; }
+</style>
+</head>
+<body>
+<div id="start">
+  <h1 style="font-size:24px">Sign Recognition</h1>
+  <p>Your laptop does the recognition; this phone is the camera and the screen.
+     Use a plain background and good light.</p>
+  <button class="primary" id="startBtn">Start camera</button>
+  <p id="startErr" style="color:var(--bad)"></p>
+</div>
+
+<h1>Sign Recognition</h1>
+<div class="stage">
+  <canvas id="view"></canvas>
+  <img id="mask" alt="hand mask">
+  <div class="hud" id="hud">–</div>
+</div>
+
+<div class="pred"><div id="predText">&nbsp;</div><div id="predConf"></div></div>
+<div class="bar"><div id="hold"></div></div>
+<div id="top"></div>
+
+<div class="card"><div class="label">Word</div><div id="word"></div></div>
+<div class="card"><div class="label">Said</div><div id="history"></div></div>
+
+<div class="row" id="normal">
+  <button id="calBtn">Calibrate</button>
+  <button id="voiceBtn" class="on">Voice on</button>
+  <button id="flipBtn">Flip cam</button>
+  <button id="clearBtn">Clear</button>
+</div>
+<div class="row" id="calib">
+  <button id="bgBtn">1. Background</button>
+  <button class="primary" id="captureBtn">2. Hand</button>
+  <button id="doneBtn">Done</button>
+</div>
+<div id="msg"></div>
+
+<script>
+(() => {
+  const HOLD_MS = 1000;          // hold a sign this long to add it to the word (final.py: 20 frames)
+  const BOX = 300;
+  const $ = id => document.getElementById(id);
+  const view = $('view'), vctx = view.getContext('2d');
+  const work = document.createElement('canvas'), wctx = work.getContext('2d');
+  const video = document.createElement('video');
+  video.playsInline = true; video.muted = true;
+
+  let facing = 'user', stream = null, busy = false, calibrating = false;
+  let voice = true, word = '', curText = '', heldSince = 0, history = [];
+  let box = {x: 300, y: 100}, lastSent = 0, fps = 0, wakeLock = null;
+
+  function msg(text, bad) { $('msg').textContent = text || ''; $('msg').className = bad ? 'bad' : ''; }
+
+  function speak(text) {
+    if (!voice || !text || !('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text.trim());
+    u.rate = 1.0;
+    speechSynthesis.speak(u);
+  }
+
+  async function startCamera() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } }
+    });
+    video.srcObject = stream;
+    await video.play();
+  }
+
+  function layout() {
+    // Same frame geometry the laptop uses: 640x480 with the box at (300, 100).
+    // In portrait the frame is 480x640 with the box centred.
+    const landscape = video.videoWidth >= video.videoHeight;
+    const W = landscape ? 640 : 480, H = landscape ? 480 : 640;
+    if (work.width !== W || work.height !== H) {
+      work.width = view.width = W; work.height = view.height = H;
+    }
+    box = landscape ? {x: 300, y: 100} : {x: (W - BOX) / 2, y: 170};
+  }
+
+  function drawFrame() {
+    const W = work.width, H = work.height, vw = video.videoWidth, vh = video.videoHeight;
+    const s = Math.max(W / vw, H / vh), dw = vw * s, dh = vh * s;
+    wctx.save();
+    if (facing === 'user') { wctx.translate(W, 0); wctx.scale(-1, 1); }   // mirror like a selfie, as final.py does
+    wctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    wctx.restore();
+    vctx.drawImage(work, 0, 0);
+    vctx.lineWidth = 3; vctx.strokeStyle = '#3ddc97';
+    vctx.strokeRect(box.x, box.y, BOX, BOX);
+    if (calibrating) {
+      vctx.lineWidth = 1;
+      for (let i = 0; i < 10; i++) for (let j = 0; j < 5; j++)
+        vctx.strokeRect(box.x + 120 + j * 20, box.y + 40 + i * 20, 10, 10);
+    }
+  }
+
+  function send(path, extra = '') {
+    return new Promise((resolve, reject) => {
+      work.toBlob(async blob => {
+        try {
+          const r = await fetch(`${path}?x=${box.x}&y=${box.y}${extra}`, {
+            method: 'POST', body: blob, headers: {'Content-Type': 'image/jpeg'}
+          });
+          resolve(await r.json());
+        } catch (e) { reject(e); }
+      }, 'image/jpeg', 0.8);
+    });
+  }
+
+  function onResult(r) {
+    if (calibrating) return;   // a reply that was in flight when calibration started
+    const now = performance.now();
+    if (!r.ok) {
+      if (r.error === 'calibrate') { setCalibrating(true); msg('Calibrate first: cover the small squares with your hand and tap Capture.'); }
+      else msg(r.error, true);
+      return;
+    }
+    if (r.mask) $('mask').src = r.mask;
+    $('top').textContent = r.top.map(([l, p]) => `${l.trim()} ${(p * 100).toFixed(0)}%`).join('   ·   ');
+    if (r.hand === 'present') {
+      $('predText').textContent = r.text.trim() || '…';
+      $('predConf').textContent = r.text ? (r.conf * 100).toFixed(0) + '%' : 'unsure';
+      if (r.text !== curText) { curText = r.text; heldSince = now; }
+      const held = now - heldSince;
+      $('hold').style.width = curText ? Math.min(100, held / HOLD_MS * 100) + '%' : '0';
+      if (curText && held >= HOLD_MS) {
+        // Same rules as final.py text_mode.
+        if (curText.length === 1) speak(curText);
+        word += curText;
+        if (word.startsWith('I/Me ')) word = word.replace('I/Me ', 'I ');
+        else if (word.endsWith('I/Me ')) word = word.replace('I/Me ', 'me ');
+        heldSince = now;
+        $('word').textContent = word;
+      }
+    } else {
+      $('hold').style.width = '0';
+      if (r.hand === 'none') {
+        // Hand removed: say the word and start a new one.
+        if (word) { speak(word); history.unshift(word.trim()); history = history.slice(0, 8); $('history').textContent = history.join('  ·  '); }
+        word = ''; curText = ''; $('word').textContent = '';
+        $('predText').innerHTML = '&nbsp;'; $('predConf').textContent = 'show your hand in the box';
+      }
+    }
+    msg('');
+  }
+
+  async function loop() {
+    if (video.readyState >= 2) {
+      layout();
+      drawFrame();
+      if (!busy && !calibrating) {
+        busy = true;
+        const t0 = performance.now();
+        send('/predict').then(r => {
+          const dt = performance.now() - t0;
+          fps = fps ? 0.85 * fps + 0.15 * (1000 / dt) : 1000 / dt;
+          $('hud').textContent = `${fps.toFixed(1)} FPS · laptop ${r.ms ?? '–'} ms`;
+          onResult(r);
+        }).catch(() => msg('Lost connection to the laptop. Is phone_server.py still running?', true))
+          .finally(() => { busy = false; });
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+
+  function setCalibrating(on) {
+    calibrating = on;
+    document.body.classList.toggle('calibrating', on);
+    curText = ''; word = ''; $('word').textContent = ''; $('hold').style.width = '0';
+    $('predText').innerHTML = '&nbsp;'; $('predConf').textContent = ''; $('top').textContent = '';
+    if (on) msg('1. Take your hand out of the green box and tap Background. 2. Cover all the small squares with your hand and tap Hand. The mask (bottom left) should show a clean white hand.');
+  }
+
+  $('startBtn').onclick = async () => {
+    // Speech on iOS must be unlocked by a tap.
+    if ('speechSynthesis' in window) speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('This page must be opened over https:// to use the camera.');
+      await startCamera();
+      $('start').style.display = 'none';
+      try { wakeLock = await navigator.wakeLock?.request('screen'); } catch (e) {}
+      requestAnimationFrame(loop);
+    } catch (e) {
+      $('startErr').textContent = 'Camera failed: ' + (e.message || e.name) +
+        (e.name === 'NotAllowedError' ? ' (allow camera access in the browser settings)' : '');
+    }
+  };
+  $('calBtn').onclick = () => setCalibrating(true);
+  $('doneBtn').onclick = () => { setCalibrating(false); msg(''); };
+  $('bgBtn').onclick = async () => {
+    try {
+      const r = await send('/calibrate', '&kind=background');
+      if (!r.ok) return msg(r.error, true);
+      if (r.mask) $('mask').src = r.mask;
+      msg(r.need === 'hand' ? 'Background captured. Now cover the small squares with your hand and tap Hand.'
+                            : 'Background updated. The mask should now be black where there is no hand.');
+    } catch (e) { msg('Could not reach the laptop.', true); }
+  };
+  $('captureBtn').onclick = async () => {
+    try {
+      const r = await send('/calibrate', '&kind=hand');
+      if (!r.ok) return msg(r.error, true);
+      $('mask').src = r.mask;
+      msg('Hand captured' + (r.background ? '' : ' (tip: tap Background with the box empty for a cleaner mask)') +
+          '. If the mask shows a clean white hand on black, tap Done. Otherwise adjust and capture again.');
+    } catch (e) { msg('Could not reach the laptop.', true); }
+  };
+  $('voiceBtn').onclick = () => {
+    voice = !voice;
+    $('voiceBtn').textContent = voice ? 'Voice on' : 'Voice off';
+    $('voiceBtn').classList.toggle('on', voice);
+    if (!voice) speechSynthesis.cancel();
+  };
+  $('flipBtn').onclick = async () => {
+    facing = facing === 'user' ? 'environment' : 'user';
+    try { await startCamera(); } catch (e) { msg('Could not switch camera: ' + e.message, true); }
+  };
+  $('clearBtn').onclick = () => { word = ''; history = []; $('word').textContent = ''; $('history').textContent = ''; };
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && wakeLock !== null) {
+      try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+    }
+  });
+})();
+</script>
+</body>
+</html>
